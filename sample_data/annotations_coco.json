@@ -1,0 +1,116 @@
+{
+    "images": [
+        {
+            "id": 1,
+            "file_name": "cat_dog.jpg",
+            "width": 640,
+            "height": 480
+        },
+        {
+            "id": 2,
+            "file_name": "living_room.jpg",
+            "width": 800,
+            "height": 600
+        },
+        {
+            "id": 3,
+            "file_name": "street.jpg",
+            "width": 1024,
+            "height": 768
+        }
+    ],
+    "annotations": [
+        {
+            "id": 101,
+            "image_id": 1,
+            "category_id": 1,
+            "bbox": [
+                50,
+                100,
+                200,
+                250
+            ]
+        },
+        {
+            "id": 102,
+            "image_id": 1,
+            "category_id": 2,
+            "bbox": [
+                300,
+                150,
+                250,
+                250
+            ]
+        },
+        {
+            "id": 103,
+            "image_id": 2,
+            "category_id": 3,
+            "bbox": [
+                100,
+                300,
+                150,
+                250
+            ]
+        },
+        {
+            "id": 104,
+            "image_id": 2,
+            "category_id": 4,
+            "bbox": [
+                300,
+                350,
+                400,
+                200
+            ]
+        },
+        {
+            "id": 105,
+            "image_id": 3,
+            "category_id": 5,
+            "bbox": [
+                100,
+                400,
+                400,
+                250
+            ]
+        },
+        {
+            "id": 106,
+            "image_id": 3,
+            "category_id": 6,
+            "bbox": [
+                600,
+                300,
+                150,
+                400
+            ]
+        }
+    ],
+    "categories": [
+        {
+            "id": 1,
+            "name": "cat"
+        },
+        {
+            "id": 2,
+            "name": "dog"
+        },
+        {
+            "id": 3,
+            "name": "chair"
+        },
+        {
+            "id": 4,
+            "name": "table"
+        },
+        {
+            "id": 5,
+            "name": "car"
+        },
+        {
+            "id": 6,
+            "name": "person"
+        }
+    ]
+}

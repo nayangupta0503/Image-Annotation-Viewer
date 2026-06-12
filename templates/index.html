@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotation Visualizer</title>
+    <!-- Google Fonts for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for clean iconography -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-vector-square logo-icon"></i>
+                <h1>Image Annotation Visualizer</h1>
+            </div>
+            <div class="status-badge-container">
+                <span id="status-badge" class="badge badge-unloaded">
+                    <i class="fa-solid fa-circle-notch"></i> No Dataset Loaded
+                </span>
+            </div>
+        </header>
+
+        <!-- Configuration Panel (Initial Screen & Collapsible Header Settings) -->
+        <section id="config-panel" class="config-panel glass-panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-sliders"></i> Configure Data Paths</h2>
+                <p>Provide paths to your local JSON annotation file and the folder containing raw images.</p>
+            </div>
+            <form id="config-form" class="config-form">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label for="json-path"><i class="fa-regular fa-file-code"></i> JSON Annotation File Path</label>
+                        <div class="input-with-button">
+                            <input type="text" id="json-path" placeholder="e.g. C:/datasets/annotations.json" required
+                                value="sample_data/annotations_flat.json">
+                            <button type="button" id="btn-browse-json" class="btn-browse" title="Browse JSON file">
+                                <i class="fa-regular fa-folder-open"></i> Browse
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="images-dir"><i class="fa-regular fa-folder-open"></i> Images Directory Path</label>
+                        <div class="input-with-button">
+                            <input type="text" id="images-dir" placeholder="e.g. C:/datasets/images" required
+                                value="sample_data/images">
+                            <button type="button" id="btn-browse-images" class="btn-browse"
+                                title="Browse Images folder">
+                                <i class="fa-regular fa-folder"></i> Browse
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" id="btn-submit" class="btn btn-primary">
+                    <i class="fa-solid fa-square-poll-vertical"></i> Load Dataset
+                </button>
+            </form>
+        </section>
+
+        <!-- Main Visualizer Layout (Initially Hidden) -->
+        <div id="visualizer-layout" class="visualizer-layout hidden">
+            <!-- Sidebar: Image List -->
+            <aside class="sidebar glass-panel">
+                <div class="sidebar-header">
+                    <h3><i class="fa-regular fa-images"></i> Image Files</h3>
+                    <div class="search-container">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="image-search" placeholder="Search by name...">
+                    </div>
+                </div>
+                <div class="list-wrapper">
+                    <ul id="image-list" class="image-list">
+                        <!-- Dynamic list items added here -->
+                    </ul>
+                </div>
+                <div class="sidebar-footer">
+                    <span id="image-stats">Total: 0 images</span>
+                </div>
+            </aside>
+
+            <!-- Viewer Area -->
+            <main class="viewer-area">
+                <div class="viewer-card glass-panel">
+                    <!-- Annotation legend details -->
+                    <div class="viewer-header">
+                        <div class="filename-title">
+                            <i class="fa-solid fa-file-image"></i>
+                            <span id="current-filename">No image selected</span>
+                        </div>
+                        <div class="viewer-actions">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggle-labels" checked>
+                                <span class="slider"></span>
+                                <span class="toggle-text"><i class="fa-solid fa-tag"></i> Show Labels</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Wrapper where Bboxes and Images reside -->
+                    <div class="canvas-outer-wrapper">
+                        <div id="canvas-wrapper" class="canvas-wrapper">
+                            <img id="main-image" src="" alt="Select an image to visualize">
+                            <div id="bbox-container" class="bbox-container">
+                                <!-- Bounding box divs will be spawned dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Controls -->
+                    <div class="viewer-footer">
+                        <button id="btn-prev" class="btn btn-secondary" title="Previous Image (Left Arrow)">
+                            <i class="fa-solid fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="navigation-info">
+                            <span id="image-index">0 / 0</span>
+                        </div>
+                        <button id="btn-next" class="btn btn-secondary" title="Next Image (Right Arrow)">
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Labels sidebar/categories overlay -->
+                <div class="labels-summary-panel glass-panel">
+                    <h3><i class="fa-solid fa-tags"></i> Categories in Image</h3>
+                    <div id="categories-legend" class="categories-legend">
+                        <!-- Categories and counts mapping -->
+                    </div>
+                    <div class="shortcuts-guide">
+                        <h4><i class="fa-solid fa-keyboard"></i> Shortcuts</h4>
+                        <ul>
+                            <li><kbd>&larr;</kbd> Prev Image</li>
+                            <li><kbd>&rarr;</kbd> Next Image</li>
+                            <li><kbd>L</kbd> Toggle Labels</li>
+                        </ul>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Error message notification popups -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+
+</html>
