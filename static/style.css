@@ -217,44 +217,61 @@ body {
     background: rgba(0, 0, 0, 0.3);
 }
 
-.input-with-button {
+.custom-file-input-wrapper {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    transition: var(--transition);
+    position: relative;
     width: 100%;
 }
 
-.input-with-button input {
-    flex: 1;
+.custom-file-input-wrapper:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+    background: rgba(0, 0, 0, 0.25);
 }
 
-.btn-browse {
+.custom-file-input-wrapper input[type="file"] {
+    display: none;
+}
+
+.custom-file-btn {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 0 18px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
-    font-family: var(--font-body);
-    font-size: 13.5px;
-    font-weight: 500;
+    user-select: none;
     white-space: nowrap;
 }
 
-.btn-browse:hover {
+.custom-file-btn:hover {
     background: var(--accent);
     border-color: var(--accent);
     color: white;
-    box-shadow: 0 0 12px var(--accent-glow);
+    box-shadow: 0 0 10px var(--accent-glow);
     transform: translateY(-1px);
 }
 
-.btn-browse i {
-    font-size: 14px;
+.file-name-display {
+    color: var(--text-secondary);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 180px);
 }
 
 /* Buttons */

@@ -4,7 +4,9 @@ let state = {
     currentIndex: -1,
     labelColors: {}, // Maps label name -> HSL color string
     hueCounter: 0,   // For generating distinct class colors
-    showLabels: true
+    showLabels: true,
+    imageFiles: {},  // Map of lowercase_filename -> File object
+    currentObjectUrl: null // Active object URL to revoke later
 };
 
 // DOM Elements
@@ -24,10 +26,12 @@ const imageIndex = document.getElementById('image-index');
 const categoriesLegend = document.getElementById('categories-legend');
 const notificationContainer = document.getElementById('notification-container');
 const canvasWrapper = document.getElementById('canvas-wrapper');
-const btnBrowseJson = document.getElementById('btn-browse-json');
-const btnBrowseImages = document.getElementById('btn-browse-images');
-const jsonPathInput = document.getElementById('json-path');
-const imagesDirInput = document.getElementById('images-dir');
+
+// File inputs & display elements
+const jsonFileInput = document.getElementById('json-file-input');
+const imagesFolderInput = document.getElementById('images-folder-input');
+const jsonFileName = document.getElementById('json-file-name');
+const imagesFolderName = document.getElementById('images-folder-name');
 
 // 1. Toast Notification system
 function showToast(message, type = 'success') {
@@ -65,105 +69,200 @@ function getLabelColor(label) {
     return color;
 }
 
-// 2.5. File/Folder Browsing logic
-btnBrowseJson.addEventListener('click', async () => {
-    try {
-        btnBrowseJson.disabled = true;
-        const originalHtml = btnBrowseJson.innerHTML;
-        btnBrowseJson.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Browsing...';
-        
-        const response = await fetch('/api/browse/file', { method: 'POST' });
-        const res = await response.json();
-        
-        btnBrowseJson.disabled = false;
-        btnBrowseJson.innerHTML = originalHtml;
-        
-        if (res.success && res.path) {
-            jsonPathInput.value = res.path;
-            showToast('JSON file selected successfully.', 'success');
-        } else if (res.error) {
-            showToast(`Error: ${res.error}`, 'danger');
-        }
-    } catch (err) {
-        btnBrowseJson.disabled = false;
-        btnBrowseJson.innerHTML = '<i class="fa-regular fa-folder-open"></i> Browse';
-        showToast(`Error communicating with backend: ${err.message}`, 'danger');
-    }
-});
-
-btnBrowseImages.addEventListener('click', async () => {
-    try {
-        btnBrowseImages.disabled = true;
-        const originalHtml = btnBrowseImages.innerHTML;
-        btnBrowseImages.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Browsing...';
-        
-        const response = await fetch('/api/browse/directory', { method: 'POST' });
-        const res = await response.json();
-        
-        btnBrowseImages.disabled = false;
-        btnBrowseImages.innerHTML = originalHtml;
-        
-        if (res.success && res.path) {
-            imagesDirInput.value = res.path;
-            showToast('Images directory selected successfully.', 'success');
-        } else if (res.error) {
-            showToast(`Error: ${res.error}`, 'danger');
-        }
-    } catch (err) {
-        btnBrowseImages.disabled = false;
-        btnBrowseImages.innerHTML = '<i class="fa-regular fa-folder"></i> Browse';
-        showToast(`Error communicating with backend: ${err.message}`, 'danger');
-    }
-});
-
-// 3. Load dataset via API
-configForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const jsonPath = document.getElementById('json-path').value.strip ? 
-                     document.getElementById('json-path').value.strip() : 
-                     document.getElementById('json-path').value.trim();
-    const imagesDir = document.getElementById('images-dir').value.strip ? 
-                      document.getElementById('images-dir').value.strip() : 
-                      document.getElementById('images-dir').value.trim();
-
-    try {
-        const response = await fetch('/api/load', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ json_path: jsonPath, images_dir: imagesDir })
+// 2.5. Annotation normalization logic in Javascript
+function normalizeAnnotations(data, imageFilesList) {
+    let normalized = [];
+    
+    // 1. COCO Format
+    if (data && typeof data === 'object' && "images" in data && "annotations" in data) {
+        const categories = {};
+        (data.categories || []).forEach(cat => {
+            categories[cat.id] = cat.name || `category_${cat.id}`;
         });
         
-        const res = await response.json();
+        const imagesDict = {};
+        (data.images || []).forEach(img => {
+            imagesDict[img.id] = {
+                filename: img.file_name,
+                width: img.width,
+                height: img.height,
+                annotations: []
+            };
+        });
         
-        if (!response.ok || !res.success) {
-            showToast(res.error || 'Failed to load dataset.', 'danger');
-            return;
-        }
+        (data.annotations || []).forEach(ann => {
+            const imgId = ann.image_id;
+            if (imagesDict[imgId]) {
+                const bbox = ann.bbox || [];
+                const catId = ann.category_id;
+                const label = categories[catId] || `category_${catId}`;
+                imagesDict[imgId].annotations.push({
+                    bbox: bbox,
+                    label: label
+                });
+            }
+        });
         
-        // Success configuration
-        state.images = res.data;
-        state.currentIndex = -1;
-        
-        showToast(`Dataset loaded successfully! Found ${res.total_images} images.`, 'success');
-        
-        // Update layout visibility and stats
-        statusBadge.className = 'badge badge-loaded';
-        statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Loaded: ${res.total_images} images`;
-        visualizerLayout.classList.remove('hidden');
-        
-        renderImageList();
-        
-        if (state.images.length > 0) {
-            selectImage(0);
-        } else {
-            clearViewer();
-        }
-        
-    } catch (err) {
-        showToast(`Network error: ${err.message}`, 'danger');
+        normalized = Object.values(imagesDict);
     }
+    // 2. Flat dictionary format
+    else if (data && typeof data === 'object' && !Array.isArray(data)) {
+        for (const [filename, annList] of Object.entries(data)) {
+            const imgAnns = [];
+            if (Array.isArray(annList)) {
+                annList.forEach(ann => {
+                    if (ann && typeof ann === 'object') {
+                        const bbox = ann.box || ann.bbox || ann.rect;
+                        const label = ann.label || ann.category || "object";
+                        if (bbox && bbox.length === 4) {
+                            imgAnns.push({ bbox, label });
+                        }
+                    }
+                });
+            }
+            normalized.push({
+                filename: filename,
+                annotations: imgAnns
+            });
+        }
+    }
+    // 3. List format
+    else if (Array.isArray(data)) {
+        data.forEach(item => {
+            if (item && typeof item === 'object') {
+                const filename = item.filename || item.file_name || item.image_path;
+                if (filename) {
+                    const annsSrc = item.annotations || item.objects || item.bboxes || [];
+                    const imgAnns = [];
+                    annsSrc.forEach(ann => {
+                        if (ann && typeof ann === 'object' && !Array.isArray(ann)) {
+                            const bbox = ann.box || ann.bbox || ann.rect;
+                            const label = ann.label || ann.category || "object";
+                            if (bbox && bbox.length === 4) {
+                                imgAnns.push({ bbox, label });
+                            }
+                        } else if (Array.isArray(ann) && ann.length === 4) {
+                            imgAnns.push({
+                                bbox: ann,
+                                label: "object"
+                            });
+                        }
+                    });
+                    
+                    const basename = filename.split(/[/\\]/).pop();
+                    normalized.push({
+                        filename: basename,
+                        annotations: imgAnns
+                    });
+                }
+            }
+        });
+    }
+
+    // Scan selected images list to add any non-annotated images
+    const imgExts = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.svg'];
+    const existingNames = new Set(normalized.map(item => item.filename.toLowerCase().split(/[/\\]/).pop()));
+    
+    imageFilesList.forEach(filename => {
+        const lowerName = filename.toLowerCase();
+        const basename = filename.split(/[/\\]/).pop().toLowerCase();
+        const hasValidExt = imgExts.some(ext => lowerName.endsWith(ext));
+        if (hasValidExt && !existingNames.has(basename)) {
+            normalized.push({
+                filename: filename.split(/[/\\]/).pop(),
+                annotations: []
+            });
+        }
+    });
+
+    normalized.sort((a, b) => a.filename.localeCompare(b.filename, undefined, { sensitivity: 'base' }));
+    return normalized;
+}
+
+// Display name updates for selected file/folder
+jsonFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        jsonFileName.textContent = file.name;
+    } else {
+        jsonFileName.textContent = 'No file selected';
+    }
+});
+
+imagesFolderInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+        let folderName = 'Folder selected';
+        const sampleFile = files[0];
+        if (sampleFile.webkitRelativePath) {
+            const parts = sampleFile.webkitRelativePath.split('/');
+            if (parts.length > 0) {
+                folderName = parts[0];
+            }
+        }
+        imagesFolderName.textContent = `${folderName} (${files.length} files)`;
+    } else {
+        imagesFolderName.textContent = 'No folder selected';
+    }
+});
+
+// 3. Load dataset locally using FileReader
+configForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const jsonFile = jsonFileInput.files[0];
+    const imageFiles = Array.from(imagesFolderInput.files);
+    
+    if (!jsonFile) {
+        showToast('Please select a JSON annotation file.', 'danger');
+        return;
+    }
+    if (imageFiles.length === 0) {
+        showToast('Please select an images folder.', 'danger');
+        return;
+    }
+    
+    // Index the selected image files by basename
+    state.imageFiles = {};
+    const imageFilenamesList = [];
+    imageFiles.forEach(file => {
+        const basename = file.name.split(/[/\\]/).pop().toLowerCase();
+        state.imageFiles[basename] = file;
+        imageFilenamesList.push(file.name);
+    });
+    
+    // Read the JSON file
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            const data = JSON.parse(event.target.result);
+            const dataset = normalizeAnnotations(data, imageFilenamesList);
+            
+            state.images = dataset;
+            state.currentIndex = -1;
+            
+            showToast(`Dataset loaded successfully! Found ${dataset.length} images.`, 'success');
+            
+            // Update layout visibility and stats
+            statusBadge.className = 'badge badge-loaded';
+            statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Loaded: ${dataset.length} images`;
+            visualizerLayout.classList.remove('hidden');
+            
+            renderImageList();
+            
+            if (state.images.length > 0) {
+                selectImage(0);
+            } else {
+                clearViewer();
+            }
+        } catch (err) {
+            showToast(`Error parsing JSON: ${err.message}`, 'danger');
+        }
+    };
+    reader.onerror = function() {
+        showToast('Error reading the JSON file.', 'danger');
+    };
+    reader.readAsText(jsonFile);
 });
 
 // 4. Render Sidebar Image List
@@ -216,8 +315,22 @@ function selectImage(index) {
     mainImage.style.opacity = '0.5';
     bboxContainer.innerHTML = '';
     
-    // Build image URL using backend endpoint
-    mainImage.src = `/api/image/${encodeURIComponent(imgData.filename)}`;
+    // Revoke previous object URL if any
+    if (state.currentObjectUrl) {
+        URL.revokeObjectURL(state.currentObjectUrl);
+        state.currentObjectUrl = null;
+    }
+    
+    // Build image URL using local File object
+    const basename = imgData.filename.split(/[/\\]/).pop().toLowerCase();
+    const fileObj = state.imageFiles[basename];
+    if (fileObj) {
+        state.currentObjectUrl = URL.createObjectURL(fileObj);
+        mainImage.src = state.currentObjectUrl;
+    } else {
+        mainImage.src = '';
+        showToast(`Image file "${imgData.filename}" not found in selected folder.`, 'danger');
+    }
     
     // Disable/Enable buttons
     btnPrev.disabled = index === 0;
